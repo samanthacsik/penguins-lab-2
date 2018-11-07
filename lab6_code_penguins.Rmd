@@ -44,9 +44,63 @@ penguins2 <- penguins %>%
         Species == "Gentoo penguin (Pygoscelis papua)" ~ "Gentoo", 
         Species == "Adelie Penguin (Pygoscelis adeliae)" ~ "Adelie"
       )
-  ) %>% 
+    ) %>% 
   select(-Species) %>% 
   filter(Sex == "FEMALE")
 
 ```
 
+Exploratory graphs and Levene's test for equal variances
+
+```{r}
+hists <- ggplot(penguins2, aes(x = `Flipper Length (mm)`)) +
+  geom_histogram(aes(fill = common_name)) +
+  facet_wrap(~ common_name, scale = "free")
+
+qqs <- ggplot(penguins2, aes(sample = `Flipper Length (mm)`)) +
+  geom_qq(aes(color = common_name)) +
+  facet_wrap(~ common_name, scale = "free")
+
+# based on histograms & qqplots, observations of each group appear normally distributed. Also, n > 30 for all groups, so means will be normally distributed by CLT.
+```
+
+Evaluate variances and perform a Levene's test for equal variances
+```{r}
+# if the largest sample is < 4x greater than the smallest sample variancer, thenathese are "close enough" to consider variances equal
+
+variances <- penguins2 %>% # units of var are obs^2
+  group_by(common_name) %>% 
+  summarise(
+    variance = var(`Flipper Length (mm)`)
+  )
+
+#largest var (33.1) is defiitely not more than 4x greater than the smallest variance (15.2)
+
+# Levene's test
+# leveneTest function in the 'car' package
+
+penguin_levene <- leveneTest(`Flipper Length (mm)` ~ common_name, data = penguins2)
+
+# H0: no difference in variances (variances are equal)
+# Ha: variances are not equal
+# we retain H0! there is no significant difference in variances across species
+```
+
+One-way ANOVA for penguin flipper lengths by species (common_name)
+
+```{r}
+# H0: means across all groups are equal
+# Ha: at least 2 group means differ significantly
+
+penguin_aov <- aov(`Flipper Length (mm)` ~ common_name, data = penguins2)
+summary(penguin_aov)
+
+# post-hoc testing by Tukey's HSD
+# H0: No sig diff in pairwise means
+# Ha: there is a sig diff in pairwise means
+penguin_ph <- TukeyHSD(penguin_aov)
+penguin_ph # reject H0 for ALL pairwise comparisons
+
+# aov.test funciton in the 'onewaytests' package DOES allow for inline references
+```
+Mean flipper lengths of female penguins differed significantly for all species studied (one-way ANOVA, F(df = statistic, p < 0.001, $\alpha$ = 0.05 with post-hoc Tukey's HSD, $\alpha$ = 0.05).
